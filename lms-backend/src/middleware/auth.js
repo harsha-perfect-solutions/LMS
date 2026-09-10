@@ -25,6 +25,10 @@ async function verifyToken(req, res, next) {
       name: user.name,
       active: user.active,
       role: user.role,
+      branch: user.branch,
+      year: user.year,
+      sem: user.sem,
+      section: user.section,
     };
     next();
   } catch (error) {

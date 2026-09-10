@@ -8,6 +8,10 @@ export interface User {
   email: string;
   role: Role;
   avatar?: string;
+  branch?: string;
+  year?: string;
+  sem?: string;
+  section?: string;
 }
 
 export interface AuthContextType {
@@ -57,6 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               name: response.data.name,
               email: response.data.email,
               role: response.data.role.toLowerCase() as Role,
+              branch: response.data.branch,
+              year: (response.data as any).year,
+              sem: (response.data as any).sem,
+              section: (response.data as any).section,
             });
           } else {
             api.logout();
@@ -93,6 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: response.data.name || "",
           email: response.data.email || "",
           role: (response.data.role?.toLowerCase() || "student") as Role,
+          branch: response.data.branch,
+          year: (response.data as any).year,
+          sem: (response.data as any).sem,
+          section: (response.data as any).section,
         };
         setUser(userData);
         return { success: true };

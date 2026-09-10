@@ -49,6 +49,19 @@ export function StudentCourses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [mainTab, setMainTab] = useState<"enrolled" | "explore">("enrolled");
+  useEffect(() => {
+    // Purge legacy un-scoped quiz and assignment completion keys from localStorage
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (
+          (key.startsWith("quiz_completed_") && !key.match(/^quiz_completed_\d+_\d+$/)) ||
+          (key.startsWith("assignment_submitted_") && !key.match(/^assignment_submitted_\d+_\d+$/))
+        ) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {}
+  }, []);
 
   const fetchCourses = async () => {
     try {
@@ -162,11 +175,11 @@ export function StudentCourses() {
           completed++;
         }
       } else if (item.itemType === "QUIZ") {
-        if (myAttemptedQuizIds.includes(item.id) || localStorage.getItem(`quiz_completed_${item.id}`)) {
+        if (myAttemptedQuizIds.includes(item.id) || (user?.id && Boolean(localStorage.getItem(`quiz_completed_${user.id}_${item.id}`)))) {
           completed++;
         }
       } else if (item.itemType === "ASSIGNMENT") {
-        if (mySubmittedAssignIds.includes(item.id) || localStorage.getItem(`assignment_submitted_${item.id}`)) {
+        if (mySubmittedAssignIds.includes(item.id) || (user?.id && Boolean(localStorage.getItem(`assignment_submitted_${user.id}_${item.id}`)))) {
           completed++;
         }
       }
@@ -183,8 +196,30 @@ export function StudentCourses() {
         (c.code || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+  const matchesStudentProfileClient = (c: Course) => {
+    if (!user) return true;
+    if (c.branch && c.branch !== "ALL" && user.branch) {
+      if (c.branch.toLowerCase() !== user.branch.toLowerCase()) return false;
+    }
+    if (c.year && c.year !== "ALL" && user.year) {
+      if (c.year.toLowerCase() !== user.year.toLowerCase()) return false;
+    }
+    if (c.sem && c.sem !== "ALL" && user.sem) {
+      const cSem = c.sem.toLowerCase();
+      const uSem = user.sem.toLowerCase();
+      if (cSem !== uSem && !cSem.includes(uSem) && !uSem.includes(cSem)) return false;
+    }
+    if (c.section && c.section !== "ALL" && user.section) {
+      const cSec = c.section.toUpperCase();
+      const uSec = user.section.toUpperCase();
+      if (cSec !== uSec && cSec !== `SECTION ${uSec}` && !cSec.endsWith(uSec)) return false;
+    }
+    return true;
+  };
+
   const exploreCourses = allCourses
     .filter((c) => c.status?.toUpperCase() === "APPROVED" && !isEnrolled(c))
+    .filter(matchesStudentProfileClient)
     .filter(
       (c) =>
         (c.name || c.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -337,6 +372,7 @@ export function StudentCourses() {
 /* STUDENT DETAILED COURSE WORKSPACE (4 TABS SPREAD ACROSS THE SCREEN)       */
 /* ========================================================================= */
 function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Course; onBack: () => void }) {
+  const { user } = useAuth();
   const [course, setCourse] = useState<Course>(initialCourse);
   const [activeTab, setActiveTab] = useState<CourseTab>("modules");
   const [contentList, setContentList] = useState<any[]>([]);
@@ -376,13 +412,13 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
             myAttemptsRes.data.forEach((att: any) => {
               if (att.quizId) {
                 attemptedQIds.push(Number(att.quizId));
-                localStorage.setItem(`quiz_completed_${att.quizId}`, "true");
+                if (user?.id) localStorage.setItem(`quiz_completed_${user.id}_${att.quizId}`, "true");
               }
             });
           }
 
           cQuizzes.forEach((q: any) => {
-            if (localStorage.getItem(`quiz_completed_${q.id}`) && !attemptedQIds.includes(q.id)) {
+            if (user?.id && localStorage.getItem(`quiz_completed_${user.id}_${q.id}`) && !attemptedQIds.includes(q.id)) {
               attemptedQIds.push(q.id);
             }
           });
@@ -401,7 +437,7 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
           userSubs.forEach((sub: any) => {
             if (sub.assignmentId) {
               submittedAIds.push(Number(sub.assignmentId));
-              localStorage.setItem(`assignment_submitted_${sub.assignmentId}`, "true");
+              if (user?.id) localStorage.setItem(`assignment_submitted_${user.id}_${sub.assignmentId}`, "true");
             }
           });
         }
@@ -412,7 +448,7 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
           setAssignmentsList(cAssigns);
 
           cAssigns.forEach((a: any) => {
-            if (localStorage.getItem(`assignment_submitted_${a.id}`) && !submittedAIds.includes(a.id)) {
+            if (user?.id && localStorage.getItem(`assignment_submitted_${user.id}_${a.id}`) && !submittedAIds.includes(a.id)) {
               submittedAIds.push(a.id);
             }
           });
@@ -527,7 +563,7 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
     });
   });
 
-  // Helper to check if a specific item in unifiedModules is genuinely completed
+  // Helper to check if a specific item in unifiedModules is genuinely completed by THIS student
   const isItemCompleted = (item: any) => {
     if (item.itemType === "SYLLABUS_PDF" || item.itemType === "FILE") {
       return Boolean(item.id && course.completedContentIds?.includes(item.id));
@@ -535,17 +571,13 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
     if (item.itemType === "QUIZ") {
       return Boolean(
         completedQuizIds.includes(item.id) ||
-        item.quizObj?.status === "COMPLETED" ||
-        item.quizObj?.completed ||
-        localStorage.getItem(`quiz_completed_${item.id}`)
+        (user?.id && localStorage.getItem(`quiz_completed_${user.id}_${item.id}`))
       );
     }
     if (item.itemType === "ASSIGNMENT") {
       return Boolean(
         submittedAssignIds.includes(item.id) ||
-        item.assignObj?.status === "SUBMITTED" ||
-        item.assignObj?.status === "GRADED" ||
-        localStorage.getItem(`assignment_submitted_${item.id}`)
+        (user?.id && localStorage.getItem(`assignment_submitted_${user.id}_${item.id}`))
       );
     }
     return false;
@@ -885,7 +917,7 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
                     const isSubmitted =
                       Boolean(sub) ||
                       submittedAssignIds.includes(a.id) ||
-                      Boolean(localStorage.getItem(`assignment_submitted_${a.id}`));
+                      Boolean(user?.id && localStorage.getItem(`assignment_submitted_${user.id}_${a.id}`));
 
                     const rawMarks = sub?.marks ?? sub?.score ?? sub?.grade;
                     const hasGradedMarks = sub && sub.status === "GRADED" && rawMarks !== undefined && rawMarks !== null && rawMarks !== "" && Number(rawMarks) >= 0;
@@ -983,9 +1015,7 @@ function StudentCourseWorkspace({ course: initialCourse, onBack }: { course: Cou
                     const isDone = Boolean(
                       att ||
                       completedQuizIds.includes(q.id) ||
-                      q.status === "COMPLETED" ||
-                      q.completed ||
-                      localStorage.getItem(`quiz_completed_${q.id}`)
+                      (user?.id && localStorage.getItem(`quiz_completed_${user.id}_${q.id}`))
                     );
                     const marks = att && typeof att.marks === "number" ? Number(att.marks) : (typeof q.marks === "number" ? Number(q.marks) : 0);
 

@@ -46,7 +46,6 @@ const navByRole: Record<Role, NavItem[]> = {
   admin: [
     { to: "", label: "Overview", icon: Home },
     { to: "users", label: "Users", icon: Users },
-    { to: "courses", label: "Course approvals", icon: ShieldCheck },
     { to: "announcements", label: "Announcements", icon: Megaphone },
     { to: "library", label: "Library", icon: BookOpen },
     { to: "reports", label: "Reports", icon: LineChart },
@@ -59,7 +58,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
-  const items = navByRole[role] ?? navByRole.student;
+
+  const isSuperAdmin = user?.email === "admin@example.com";
+  let items = navByRole[role] ?? navByRole.student;
+
+  if (role === "admin" && !isSuperAdmin) {
+    items = [
+      { to: "", label: "Overview", icon: Home },
+      { to: "users", label: "Users", icon: Users },
+      { to: "courses", label: "Course approvals", icon: ShieldCheck },
+      { to: "announcements", label: "Announcements", icon: Megaphone },
+      { to: "library", label: "Library", icon: BookOpen },
+      { to: "reports", label: "Reports", icon: LineChart },
+    ];
+  }
+
   const meta = roleMeta[role] ?? roleMeta.student;
 
   const basePath = `/dashboard/${role}`;

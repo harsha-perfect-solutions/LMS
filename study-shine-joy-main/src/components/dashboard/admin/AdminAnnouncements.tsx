@@ -1,10 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { Megaphone, Edit3, Trash2, Filter, X, Save, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { type Announcement, api, formatRelativeTime } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card, Btn } from "../../shared/UIPrimitives";
 import { toast } from "sonner";
 
 export function AdminAnnouncements() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.email === "admin@example.com";
+  const hodBranch = currentUser?.branch || "";
+
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState("ALL");
@@ -58,9 +63,19 @@ export function AdminAnnouncements() {
     }
     try {
       setSubmitting(true);
-      const res = await api.createAnnouncement({ title, body, audience, category: "ANNOUNCEMENT" });
+      const res = await api.createAnnouncement({ 
+        title, 
+        body, 
+        audience, 
+        branch: !isSuperAdmin ? hodBranch : (audience !== "ALL" && audience !== "STUDENTS" && audience !== "FACULTY" ? audience : "ALL"),
+        category: "ANNOUNCEMENT" 
+      });
       if (res.success) {
-        toast.success("Broadcast announcement sent successfully!");
+        toast.success(
+          !isSuperAdmin && hodBranch 
+            ? `${hodBranch} Department announcement broadcasted!` 
+            : "Campus announcement broadcasted successfully!"
+        );
         setTitle("");
         setBody("");
         setAudience("ALL");
@@ -131,9 +146,8 @@ export function AdminAnnouncements() {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (!window.confirm("Are you sure you want to delete this announcement across campus?")) return;
+    if (!window.confirm("Are you sure you want to delete this announcement?")) return;
     try {
-      // Optimistic removal
       setItems((prev) => prev.filter((item) => item.id !== id));
       const res = await api.deleteAnnouncement(id);
       if (res.success) {
@@ -172,13 +186,18 @@ export function AdminAnnouncements() {
 
   return (
     <>
-      <PageHeader title="Global Announcements" subtitle="Broadcast and manage messages across the entire campus." />
+      <PageHeader 
+        title={!isSuperAdmin && hodBranch ? `Department Announcements (${hodBranch})` : "Global Campus Announcements"} 
+        subtitle={!isSuperAdmin && hodBranch ? `Broadcast and manage messages for ${hodBranch} department students and faculty.` : "Broadcast and manage messages across the entire campus."} 
+      />
       
       {/* Broadcast Form Card */}
       <Card>
         <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
           <Megaphone className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-bold text-foreground">Create New Broadcast</h3>
+          <h3 className="text-lg font-bold text-foreground">
+            {!isSuperAdmin && hodBranch ? `Create ${hodBranch} Department Broadcast` : "Create New Broadcast"}
+          </h3>
         </div>
 
         <div className="grid gap-3">
@@ -203,9 +222,27 @@ export function AdminAnnouncements() {
                 onChange={(e) => setAudience(e.target.value)}
                 className="rounded-xl border border-border bg-secondary/30 px-3.5 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
               >
-                <option value="ALL">🌐 All Campus (Everyone)</option>
-                <option value="STUDENTS">🎓 Students Only</option>
-                <option value="FACULTY">🏫 Faculty Only</option>
+                {!isSuperAdmin && hodBranch ? (
+                  <>
+                    <option value="ALL">🏢 All {hodBranch} Department Members</option>
+                    <option value="STUDENTS">🎓 {hodBranch} Students Only</option>
+                    <option value="FACULTY">🏫 {hodBranch} Faculty Only</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="ALL">🌐 All Campus (Everyone)</option>
+                    <option value="STUDENTS">🎓 All Campus Students</option>
+                    <option value="FACULTY">🏫 All Campus Faculty</option>
+                    <option value="CSE">💻 CSE Department</option>
+                    <option value="AI & ML">🤖 AI & ML Department</option>
+                    <option value="AI & DS">📊 AI & DS Department</option>
+                    <option value="IT">🖥️ IT Department</option>
+                    <option value="ECE">⚡ ECE Department</option>
+                    <option value="EEE">🔌 EEE Department</option>
+                    <option value="MECH">⚙️ MECH Department</option>
+                    <option value="CIVIL">🏗️ CIVIL Department</option>
+                  </>
+                )}
               </select>
             </div>
 

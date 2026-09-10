@@ -1,5 +1,6 @@
 const { Course, CourseContent, User, Notification } = require("../models");
 const fs = require("fs");
+const path = require("path");
 const pdf = require("pdf-parse");
 
 async function extractPdfText(filePath) {
@@ -41,6 +42,47 @@ function serializeCourse(course, viewerId) {
   };
 }
 
+function matchesStudentProfile(course, user) {
+  const enrolled = (course.enrolledStudentIds || []).map(id => String(id));
+  if (enrolled.includes(String(user.userId || user.id))) {
+    return true;
+  }
+
+  // Branch matching
+  if (course.branch && course.branch !== "ALL" && user.branch) {
+    if (course.branch.toUpperCase() !== user.branch.toUpperCase()) {
+      return false;
+    }
+  }
+
+  // Year matching
+  if (course.year && course.year !== "ALL" && user.year) {
+    if (course.year.toLowerCase() !== user.year.toLowerCase()) {
+      return false;
+    }
+  }
+
+  // Sem matching
+  if (course.sem && course.sem !== "ALL" && user.sem) {
+    const cSem = course.sem.toLowerCase();
+    const uSem = user.sem.toLowerCase();
+    if (cSem !== uSem && !cSem.includes(uSem) && !uSem.includes(cSem)) {
+      return false;
+    }
+  }
+
+  // Section matching
+  if (course.section && course.section !== "ALL" && user.section) {
+    const cSec = course.section.toUpperCase();
+    const uSec = user.section.toUpperCase();
+    if (cSec !== uSec && cSec !== `SECTION ${uSec}` && !cSec.endsWith(uSec)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 exports.getAllCourses = async (req, res) => {
   const role = String(req.user.role).toUpperCase();
   let whereClause = {};
@@ -55,7 +97,13 @@ exports.getAllCourses = async (req, res) => {
   });
 
   const viewerId = req.user.userId;
-  return res.json(courses.map((course) => {
+  let filteredCourses = courses;
+
+  if (role === "STUDENT") {
+    filteredCourses = courses.filter(c => matchesStudentProfile(c, req.user));
+  }
+
+  return res.json(filteredCourses.map((course) => {
     const totalContentCount = course.contents ? course.contents.length : 0;
     course.setDataValue('totalContentCount', totalContentCount);
     return serializeCourse(course, viewerId);
@@ -67,7 +115,13 @@ exports.getApprovedCourses = async (req, res) => {
     where: { status: "APPROVED" },
     include: [{ model: CourseContent, as: 'contents', attributes: ['id'] }]
   });
-  return res.json(courses.map((course) => {
+  
+  let filteredCourses = courses;
+  if (req.user && String(req.user.role).toUpperCase() === "STUDENT") {
+    filteredCourses = courses.filter(c => matchesStudentProfile(c, req.user));
+  }
+
+  return res.json(filteredCourses.map((course) => {
     const totalContentCount = course.contents ? course.contents.length : 0;
     course.setDataValue('totalContentCount', totalContentCount);
     return serializeCourse(course, req.user?.userId);
@@ -127,7 +181,7 @@ exports.markContentComplete = async (req, res) => {
 
 exports.createCourse = async (req, res) => {
   try {
-    const { title, code, description, content, branch, regulation } = req.body;
+    const { title, code, description, content, branch, regulation, year, sem, section } = req.body;
     if (!title || !code) return res.status(400).json({ message: "Title and code are required" });
 
     let pdfContent = content || "";
@@ -151,6 +205,9 @@ exports.createCourse = async (req, res) => {
       pdfUrl: pdfUrl,
       branch: branch || "ALL",
       regulation: regulation || "ALL",
+      year: year || "ALL",
+      sem: sem || "ALL",
+      section: section || "ALL",
       facultyId: req.user.userId,
       facultyName: req.user.name,
       status: req.user.role === "ADMIN" ? "APPROVED" : "PENDING",
@@ -159,14 +216,21 @@ exports.createCourse = async (req, res) => {
       progressByStudent: {},
     });
 
-    // If faculty creates course, notify all admins for approval
+    // If faculty creates course, notify the target branch HOD for approval (or all admins if ALL)
     if (newCourse.status === "PENDING") {
-      const admins = await User.findAll({ where: { role: "ADMIN" } });
+      let adminWhere = { role: "ADMIN" };
+      if (newCourse.branch && newCourse.branch !== "ALL") {
+        adminWhere.branch = newCourse.branch;
+      }
+      let admins = await User.findAll({ where: adminWhere });
+      if (admins.length === 0) {
+        admins = await User.findAll({ where: { role: "ADMIN" } });
+      }
       if (admins.length > 0) {
         const notifications = admins.map(admin => ({
           userId: admin.id,
           title: "New Course Approval Request",
-          message: `Faculty ${req.user.name} has submitted a new course "${title}" for approval.`,
+          message: `Faculty ${req.user.name} submitted "${title}" for ${newCourse.branch} (${newCourse.year || 'ALL'} / ${newCourse.sem || 'ALL'} / Sec ${newCourse.section || 'ALL'}).`,
           type: "WARNING",
           isRead: false
         }));

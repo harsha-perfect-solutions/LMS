@@ -54,6 +54,10 @@ export interface Course {
   content?: string;
   branch?: string;
   regulation?: string;
+  year?: string;
+  sem?: string;
+  section?: string;
+  pdfUrl?: string;
   facultyId?: number;
   facultyName?: string;
   status?: string;
@@ -61,6 +65,7 @@ export interface Course {
   progress?: number;
   rejectionReason?: string;
   completedContentIds?: number[];
+  enrolledStudentIds?: number[];
   createdAt?: string;
   updatedAt?: string;
 }

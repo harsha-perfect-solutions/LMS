@@ -60,11 +60,35 @@ export function FacultyCourses() {
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
-  const [branch, setBranch] = useState("ALL");
-  const [regulation, setRegulation] = useState("ALL");
+  const [branch, setBranch] = useState(user?.branch || "CSE");
+  const [year, setYear] = useState("3rd Year");
+  const [sem, setSem] = useState("5th Sem");
+  const [section, setSection] = useState("Section A");
+  const [regulation, setRegulation] = useState("VR23");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [submittingCourse, setSubmittingCourse] = useState(false);
+
+  const getSemestersForYear = (selectedYear: string) => {
+    switch (selectedYear) {
+      case "1st Year":
+        return ["1st Sem", "2nd Sem"];
+      case "2nd Year":
+        return ["3rd Sem", "4th Sem"];
+      case "3rd Year":
+        return ["5th Sem", "6th Sem"];
+      case "4th Year":
+        return ["7th Sem", "8th Sem"];
+      default:
+        return ["1st Sem", "2nd Sem"];
+    }
+  };
+
+  const handleYearChange = (newYear: string) => {
+    setYear(newYear);
+    const availableSems = getSemestersForYear(newYear);
+    setSem(availableSems[0]);
+  };
 
   const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -338,6 +362,9 @@ export function FacultyCourses() {
       formData.append("code", code);
       formData.append("description", description);
       formData.append("branch", branch || "ALL");
+      formData.append("year", year || "ALL");
+      formData.append("sem", sem || "ALL");
+      formData.append("section", section || "ALL");
       formData.append("regulation", regulation || "ALL");
       formData.append("pdf", pdfFile);
 
@@ -346,8 +373,11 @@ export function FacultyCourses() {
         setTitle("");
         setCode("");
         setDescription("");
-        setBranch("ALL");
-        setRegulation("ALL");
+        setBranch(user?.branch || "CSE");
+        setYear("3rd Year");
+        setSem("5th Sem");
+        setSection("Section A");
+        setRegulation("VR23");
         setPdfFile(null);
         setPdfError(null);
         setIsAddCourseOpen(false);
@@ -1170,13 +1200,19 @@ export function FacultyCourses() {
                     <StatusPill status={course.status || "APPROVED"} />
                   </div>
 
-                  {/* Branch & Regulation Badges */}
+                  {/* Branch, Year, Sem, Section & Regulation Badges */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-2 text-[10px] uppercase font-bold tracking-wider">
                     <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                      Branch: {course.branch || "ALL"}
+                      Dept: {course.branch || "ALL"}
                     </span>
-                    <span className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
-                      Reg: {course.regulation || "ALL"}
+                    <span className="text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
+                      {course.year || "ALL Years"}
+                    </span>
+                    <span className="text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                      {course.sem || "ALL Sems"}
+                    </span>
+                    <span className="text-pink-600 dark:text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md border border-pink-500/20">
+                      Sec: {course.section || "ALL"}
                     </span>
                   </div>
 
@@ -1272,26 +1308,20 @@ export function FacultyCourses() {
                 />
               </div>
 
-              {/* Target Branch Input */}
-              <div>
+              {/* Target Department Branch */}
+              <div className="sm:col-span-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                  Target Branch (ALL or Specific)
+                  Target Department / Branch *
                 </label>
-                <input
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value.toUpperCase())}
-                  placeholder="e.g. ALL, CSE, ECE, IT..."
-                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition uppercase"
-                />
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {["ALL", "CSE", "ECE", "EEE", "MECH", "CIVIL", "IT", "AI&DS"].map((b) => (
+                <div className="flex flex-wrap gap-1.5">
+                  {["CSE", "AI & ML", "AI & DS", "IT", "ECE", "EEE", "MECH", "CIVIL"].map((b) => (
                     <button
                       type="button"
                       key={b}
                       onClick={() => setBranch(b)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition ${
+                      className={`text-xs font-bold px-3 py-1.5 rounded-xl transition ${
                         branch === b
-                          ? "bg-primary text-primary-foreground shadow-sm"
+                          ? "bg-primary text-primary-foreground shadow-sm scale-105"
                           : "bg-secondary text-muted-foreground hover:bg-secondary/80"
                       }`}
                     >
@@ -1299,35 +1329,77 @@ export function FacultyCourses() {
                     </button>
                   ))}
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Courses submitted for <strong>{branch}</strong> will route directly to the <strong>{branch} HOD</strong> for approval.
+                </p>
+              </div>
+
+              {/* Target Academic Year */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Target Academic Year *
+                </label>
+                <select
+                  value={year}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition"
+                >
+                  <option value="1st Year">1st Year (1st & 2nd Sem)</option>
+                  <option value="2nd Year">2nd Year (3rd & 4th Sem)</option>
+                  <option value="3rd Year">3rd Year (5th & 6th Sem)</option>
+                  <option value="4th Year">4th Year (7th & 8th Sem)</option>
+                </select>
+              </div>
+
+              {/* Target Semester (Dynamic options based on selected year) */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Target Semester * <span className="text-[10px] text-primary font-normal">(Dynamic for {year})</span>
+                </label>
+                <select
+                  value={sem}
+                  onChange={(e) => setSem(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition"
+                >
+                  {getSemestersForYear(year).map((sOption) => (
+                    <option key={sOption} value={sOption}>
+                      {sOption}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Target Section */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                  Target Section *
+                </label>
+                <select
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition"
+                >
+                  <option value="Section A">Section A</option>
+                  <option value="Section B">Section B</option>
+                </select>
               </div>
 
               {/* Academic Regulation Input */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                  Academic Regulation (ALL or VR23...)
+                  Academic Regulation
                 </label>
-                <input
+                <select
                   value={regulation}
-                  onChange={(e) => setRegulation(e.target.value.toUpperCase())}
-                  placeholder="e.g. ALL, VR23, VR21, AR23..."
-                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition uppercase"
-                />
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {["ALL", "VR23", "VR21", "AR23", "AR21", "R20"].map((reg) => (
-                    <button
-                      type="button"
-                      key={reg}
-                      onClick={() => setRegulation(reg)}
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition ${
-                        regulation === reg
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                      }`}
-                    >
-                      {reg}
-                    </button>
-                  ))}
-                </div>
+                  onChange={(e) => setRegulation(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-ring/40 transition"
+                >
+                  <option value="VR23">VR23</option>
+                  <option value="VR21">VR21</option>
+                  <option value="AR23">AR23</option>
+                  <option value="AR21">AR21</option>
+                  <option value="R20">R20</option>
+                </select>
               </div>
 
               <div className="sm:col-span-2">

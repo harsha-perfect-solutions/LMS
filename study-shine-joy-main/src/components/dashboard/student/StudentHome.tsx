@@ -103,7 +103,7 @@ export function StudentHome() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Welcome back, ${user?.name?.split(" ")[0] || "User"} 👋`}
+        title={`Welcome back, ${user?.name || "User"} 👋`}
         subtitle="Here's what's happening in your learning journey today."
       />
 

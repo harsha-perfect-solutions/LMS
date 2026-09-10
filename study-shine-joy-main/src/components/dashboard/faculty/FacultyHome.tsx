@@ -42,7 +42,7 @@ export function FacultyHome() {
   return (
     <>
       <PageHeader
-        title={`Hello, ${user?.name?.split(" ")[0] || "Faculty"} 🌿`}
+        title={`Hello, ${user?.name || "Faculty"} 👋`}
         subtitle="Your teaching at a glance."
         action={
           <Btn onClick={() => navigate({ to: "/dashboard/faculty/courses" })}>

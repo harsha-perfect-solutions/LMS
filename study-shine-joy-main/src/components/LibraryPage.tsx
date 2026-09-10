@@ -65,6 +65,7 @@ export function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "PDF" | "DOC" | "VIDEO" | "LINK">("ALL");
+  const [yearFilter, setYearFilter] = useState<string>("ALL");
   const [branchFilter, setBranchFilter] = useState<string>("ALL");
   const [regulationFilter, setRegulationFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "APPROVED" | "PENDING">("ALL");
@@ -78,7 +79,7 @@ export function LibraryPage() {
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
   const [type, setType] = useState<"PDF" | "DOC" | "VIDEO" | "LINK">("PDF");
-  const [category, setCategory] = useState("General");
+  const [category, setCategory] = useState("ALL");
   const [branch, setBranch] = useState("ALL");
   const [regulation, setRegulation] = useState("ALL");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -200,7 +201,7 @@ export function LibraryPage() {
     setCoverFile(null);
     setCoverPreview(null);
     setCoverError(null);
-    setCategory("General");
+    setCategory("ALL");
     setBranch("ALL");
     setRegulation("ALL");
     setType("PDF");
@@ -363,6 +364,15 @@ export function LibraryPage() {
         const rType = (r.type || "").toUpperCase();
         const matchesType = typeFilter === "ALL" || rType === typeFilter;
 
+        const rYear = (r.category || r.courseName || "").toUpperCase();
+        const matchesYear =
+          yearFilter === "ALL" ||
+          rYear === yearFilter.toUpperCase() ||
+          (yearFilter === "1ST YEAR" && (rYear.includes("1ST") || rYear.includes("1"))) ||
+          (yearFilter === "2ND YEAR" && (rYear.includes("2ND") || rYear.includes("2"))) ||
+          (yearFilter === "3RD YEAR" && (rYear.includes("3RD") || rYear.includes("3"))) ||
+          (yearFilter === "4TH YEAR" && (rYear.includes("4TH") || rYear.includes("4")));
+
         const rBranch = (r.branch || "ALL").toUpperCase();
         const matchesBranch =
           branchFilter === "ALL" || rBranch === branchFilter.toUpperCase();
@@ -378,19 +388,19 @@ export function LibraryPage() {
             ? r.status === "PENDING_APPROVAL" || r.isApproved === false
             : r.status === "APPROVED" || r.isApproved !== false;
 
-        return matchesSearch && matchesType && matchesBranch && matchesReg && matchesStatus;
+        return matchesSearch && matchesType && matchesYear && matchesBranch && matchesReg && matchesStatus;
       })
       .sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : a.id;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : b.id;
         return dateB - dateA;
       });
-  }, [resources, search, typeFilter, branchFilter, regulationFilter, statusFilter]);
+  }, [resources, search, typeFilter, yearFilter, branchFilter, regulationFilter, statusFilter]);
 
   // Reset to page 1 whenever search or filter options change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, typeFilter, branchFilter, regulationFilter, statusFilter]);
+  }, [search, typeFilter, yearFilter, branchFilter, regulationFilter, statusFilter]);
 
   const totalPages = Math.ceil(sortedFiltered.length / ITEMS_PER_PAGE) || 1;
   const paginatedResources = sortedFiltered.slice(
@@ -489,6 +499,30 @@ export function LibraryPage() {
             </select>
           </div>
 
+          {/* Target Year Filter Dropdown */}
+          <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3.5 py-2.5 shadow-sm min-w-[140px]">
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="w-full bg-transparent text-xs font-bold outline-none cursor-pointer text-foreground uppercase"
+            >
+              <option value="ALL" className="bg-card text-foreground">
+                All Years
+              </option>
+              <option value="1ST YEAR" className="bg-card text-foreground">
+                1st Year
+              </option>
+              <option value="2ND YEAR" className="bg-card text-foreground">
+                2nd Year
+              </option>
+              <option value="3RD YEAR" className="bg-card text-foreground">
+                3rd Year
+              </option>
+              <option value="4TH YEAR" className="bg-card text-foreground">
+                4th Year
+              </option>
+            </select>
+          </div>
 
           {/* Branch Filter Dropdown */}
           <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3.5 py-2.5 shadow-sm min-w-[150px]">
@@ -555,28 +589,6 @@ export function LibraryPage() {
             </select>
           </div>
 
-          {/* Status Filter for Admins and Faculty */}
-          {(isUserAdmin || isUserFaculty) && (
-            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-3.5 py-2.5 shadow-sm min-w-[170px]">
-              <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full bg-transparent text-xs font-bold outline-none cursor-pointer text-foreground uppercase"
-              >
-                <option value="ALL" className="bg-card text-foreground">
-                  All Statuses
-                </option>
-                <option value="APPROVED" className="bg-card text-foreground">
-                  Approved Only
-                </option>
-                <option value="PENDING" className="bg-card text-foreground">
-                  Pending Approval (&gt;50MB)
-                </option>
-              </select>
-            </div>
-          )}
-
           {/* Grid / List View Mode Switcher */}
           <div className="flex items-center rounded-2xl border border-border bg-card p-1 shadow-sm shrink-0">
             <button
@@ -618,9 +630,9 @@ export function LibraryPage() {
                 return (
                   <Card key={r.id} className={`group relative flex flex-col justify-between ${isPending ? 'border-amber-500/50 bg-amber-500/5 dark:bg-amber-500/10' : ''}`}>
                     <div>
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <div
-                          className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold ${
+                          className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold shrink-0 ${
                             (r.type || "").toUpperCase() === "VIDEO"
                               ? "bg-red-500/10 text-red-500 border border-red-500/20"
                               : (r.type || "").toUpperCase() === "LINK"
@@ -633,19 +645,32 @@ export function LibraryPage() {
                           {getIcon(r.type)}
                           <span>{getTypeLabel(r.type)}</span>
                         </div>
-                        {(isUserAdmin || (isUserFaculty && r.facultyId === Number(user.id))) && (
-                          <button
-                            onClick={() => handleDelete(r.id)}
-                            className="opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-destructive"
-                            title="Delete Resource"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 truncate">
+                            <User className="h-3 w-3 text-primary shrink-0" />
+                            <span className="truncate">
+                              {r.faculty?.role === "ADMIN" || getFacultyName(r).toLowerCase().includes("admin")
+                                ? "By: "
+                                : "Faculty: "}
+                              <HighlightText text={getFacultyName(r)} search={search} />
+                            </span>
+                          </div>
+
+                          {(isUserAdmin || (isUserFaculty && r.facultyId === Number(user.id))) && (
+                            <button
+                              onClick={() => handleDelete(r.id)}
+                              className="opacity-0 group-hover:opacity-100 transition text-muted-foreground hover:text-destructive shrink-0 p-1"
+                              title="Delete Resource"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-4 flex items-start gap-3.5">
-                        {/* Left Column: Category Badges, Faculty, Title, Description */}
+                        {/* Left Column: Category Badges, Title, Description */}
                         <div className="flex-1 min-w-0">
                           {/* Category, Branch & Regulation Badges */}
                           <div className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase font-bold tracking-wider mb-2">
@@ -667,16 +692,6 @@ export function LibraryPage() {
                               <span>Pending Admin Approval (&gt;50MB)</span>
                             </div>
                           )}
-
-                          <div className="flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 w-fit mb-2">
-                            <User className="h-3 w-3 text-primary shrink-0" />
-                            <span>
-                              {r.faculty?.role === "ADMIN" || getFacultyName(r).toLowerCase().includes("admin")
-                                ? "By: "
-                                : "Faculty: "}
-                              <HighlightText text={getFacultyName(r)} search={search} />
-                            </span>
-                          </div>
 
                           <h4 className="font-bold text-base line-clamp-1 text-foreground mt-2">
                             <HighlightText text={r.title} search={search} />
@@ -966,14 +981,19 @@ export function LibraryPage() {
 
                 <div>
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                    Category / Course
+                    Target Year (ALL or Specific)
                   </label>
-                  <input
-                    placeholder="e.g. General, Python, COA"
+                  <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                  />
+                    className="w-full rounded-xl border border-border bg-secondary/30 px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+                  >
+                    <option value="ALL">🌐 ALL Years (General)</option>
+                    <option value="1st Year">🎓 1st Year</option>
+                    <option value="2nd Year">🎓 2nd Year</option>
+                    <option value="3rd Year">🎓 3rd Year</option>
+                    <option value="4th Year">🎓 4th Year</option>
+                  </select>
                 </div>
               </div>
 

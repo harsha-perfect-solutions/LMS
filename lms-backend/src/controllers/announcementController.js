@@ -46,6 +46,7 @@ function serializeAnnouncement(a) {
     title: a.title,
     body: a.body,
     audience: a.audience,
+    branch: a.branch || "ALL",
     courseId: a.courseId || null,
     authorName: a.authorName || "Faculty Instructor",
     authorRole: a.authorRole || "FACULTY",
@@ -60,21 +61,19 @@ function serializeAnnouncement(a) {
 exports.getAllAnnouncements = async (req, res) => {
   try {
     const role = String(req.user.role).toUpperCase();
+    const isSuperAdmin = req.user.email === "admin@example.com";
     const reqCategory = req.query.category ? String(req.query.category).toUpperCase().trim() : null;
     let whereClause = {};
 
+    if (!isSuperAdmin) {
+      const userBranch = req.user.branch || "";
+      whereClause.branch = userBranch ? { [Op.in]: ["ALL", userBranch] } : "ALL";
+    }
+
     if (role === "STUDENT") {
-      whereClause = {
-        [Op.or]: [{ audience: "ALL" }, { audience: "STUDENTS" }],
-      };
+      whereClause.audience = { [Op.in]: ["ALL", "STUDENTS", req.user.branch || ""] };
     } else if (role === "FACULTY") {
-      whereClause = {
-        [Op.or]: [{ audience: "ALL" }, { audience: "FACULTY" }, { audience: "STUDENTS" }],
-      };
-    } else if (role === "ADMIN") {
-      whereClause = {};
-    } else {
-      whereClause = { audience: "ALL" };
+      whereClause.audience = { [Op.in]: ["ALL", "FACULTY", "STUDENTS", req.user.branch || ""] };
     }
 
     if (reqCategory) {
@@ -103,7 +102,8 @@ exports.getAllAnnouncements = async (req, res) => {
 
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { _action, id, title, body, audience, courseId, category, type } = req.body;
+    const { _action, id, title, body, audience, branch, courseId, category, type } = req.body;
+    const isSuperAdmin = req.user.email === "admin@example.com";
 
     // 1. Handle DELETE action explicitly first
     if (_action === "DELETE") {
@@ -136,7 +136,17 @@ exports.createAnnouncement = async (req, res) => {
       return res.json(serializeAnnouncement({ ...plain, createdAt: now, updatedAt: now }));
     }
 
-    // 3. Create New Announcement / Discussion Topic
+    // 3. Create New Announcement / Broadcast
+    let targetBranch = "ALL";
+    if (!isSuperAdmin && req.user.branch) {
+      // Department HOD or Faculty: Lock target branch to their department!
+      targetBranch = req.user.branch;
+    } else if (branch) {
+      targetBranch = branch;
+    } else if (audience && ["CSE", "AI & ML", "AI & DS", "IT", "ECE", "EEE", "MECH", "CIVIL"].includes(audience.toString().trim())) {
+      targetBranch = audience.toString().trim();
+    }
+
     const audienceValue = (audience || "ALL").toString().toUpperCase().trim();
     const categoryValue = (category || type || "ANNOUNCEMENT").toString().toUpperCase().trim();
     const defaultAuthorName = req.user ? (req.user.name || req.user.email) : "Instructor";
@@ -146,12 +156,40 @@ exports.createAnnouncement = async (req, res) => {
       title: title || "Untitled Topic",
       body: body || "",
       audience: audienceValue,
+      branch: targetBranch,
       category: categoryValue,
       courseId: courseId ? Number(courseId) : null,
       authorName: req.body.authorName || defaultAuthorName,
       authorRole: req.body.authorRole || defaultAuthorRole,
       replies: [],
     });
+
+    // Notify targeted users in the app
+    const { User, Notification } = require("../models");
+    if (categoryValue === "ANNOUNCEMENT") {
+      let userWhere = { active: true };
+      if (targetBranch !== "ALL") {
+        userWhere.branch = targetBranch;
+      }
+      if (audienceValue === "STUDENTS") {
+        userWhere.role = "STUDENT";
+      } else if (audienceValue === "FACULTY") {
+        userWhere.role = "FACULTY";
+      }
+
+      const targetUsers = await User.findAll({ where: userWhere, attributes: ["id"] });
+      if (targetUsers.length > 0) {
+        const notifications = targetUsers.map((u) => ({
+          userId: u.id,
+          title: `📢 ${targetBranch !== "ALL" ? targetBranch + " Announcement" : "Campus Announcement"}`,
+          message: `${title}: ${(body || "").slice(0, 100)}...`,
+          type: "INFO",
+          isRead: false,
+        }));
+        await Notification.bulkCreate(notifications);
+      }
+    }
+
     return res.status(201).json(serializeAnnouncement(announcement.toJSON()));
   } catch (err) {
     console.error("Error in createAnnouncement handler:", err);

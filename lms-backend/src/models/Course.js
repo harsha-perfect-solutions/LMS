@@ -12,6 +12,9 @@ module.exports = (sequelize) => {
     facultyName: { type: DataTypes.STRING },
     branch: { type: DataTypes.STRING, defaultValue: "ALL" },
     regulation: { type: DataTypes.STRING, defaultValue: "ALL" },
+    year: { type: DataTypes.STRING, defaultValue: "ALL" },
+    sem: { type: DataTypes.STRING, defaultValue: "ALL" },
+    section: { type: DataTypes.STRING, defaultValue: "ALL" },
     status: { type: DataTypes.STRING, defaultValue: "PENDING" },
     studentCount: { type: DataTypes.INTEGER, defaultValue: 0 },
     enrolledStudentIds: {

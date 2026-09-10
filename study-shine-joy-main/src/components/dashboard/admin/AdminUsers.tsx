@@ -1,11 +1,16 @@
 import { useState, useEffect } from "react";
 import { ShieldCheck, GraduationCap, Users, UserCheck, UserX, Search, CheckCircle2, XCircle } from "lucide-react";
 import { type AdminUser, api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card, Btn, StatusPill } from "../../shared/UIPrimitives";
 
 type RoleFilter = "ALL" | "ADMIN" | "FACULTY" | "STUDENT";
 
 export function AdminUsers() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.email === "admin@example.com";
+  const hodBranch = currentUser?.branch || "";
+
   const [usersData, setUsersData] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<RoleFilter>("ALL");
@@ -42,25 +47,53 @@ export function AdminUsers() {
     if (res.success) await fetchUsers();
   };
 
+  // Scope user data for department HOD vs Super Admin
+  const scopedUsers = (isSuperAdmin || !hodBranch)
+    ? usersData
+    : usersData.filter((u: any) => u.branch === hodBranch);
+
   // Counts by role
-  const totalCount = usersData.length;
-  const adminUsers = usersData.filter((u) => u.role?.toUpperCase() === "ADMIN");
-  const facultyUsers = usersData.filter((u) => u.role?.toUpperCase() === "FACULTY");
-  const studentUsers = usersData.filter((u) => u.role?.toUpperCase() === "STUDENT");
+  const totalCount = scopedUsers.length;
+  const adminUsers = scopedUsers.filter((u) => u.role?.toUpperCase() === "ADMIN");
+  const facultyUsers = scopedUsers.filter((u) => u.role?.toUpperCase() === "FACULTY");
+  const studentUsers = scopedUsers.filter((u) => u.role?.toUpperCase() === "STUDENT");
+
+  const getSemOptionsForYear = (yr: string) => {
+    if (yr === "1st Year") return ["Overall", "1st Sem", "2nd Sem"];
+    if (yr === "2nd Year") return ["Overall", "3rd Sem", "4th Sem"];
+    if (yr === "3rd Year") return ["Overall", "5th Sem", "6th Sem"];
+    if (yr === "4th Year") return ["Overall", "7th Sem", "8th Sem"];
+    return ["Overall", "1st Sem", "2nd Sem", "3rd Sem", "4th Sem", "5th Sem", "6th Sem", "7th Sem", "8th Sem"];
+  };
+
+  const handleYearFilterChange = (newYear: string) => {
+    setYearFilter(newYear);
+    const validSemOptions = getSemOptionsForYear(newYear);
+    if (!validSemOptions.includes(semFilter)) {
+      setSemFilter("Overall");
+    }
+  };
 
   // Filtered users for table
-  const filteredUsers = usersData
+  const filteredUsers = scopedUsers
     .filter((u: any) => {
       if (selectedRole !== "ALL" && u.role?.toUpperCase() !== selectedRole) return false;
       if (yearFilter !== "Overall" && u.year !== yearFilter) return false;
       if (branchFilter !== "Overall" && u.branch !== branchFilter) return false;
-      if (semFilter !== "Overall" && u.sem !== semFilter) return false;
+      if (semFilter !== "Overall") {
+        const uSem = (u.sem || "").toLowerCase();
+        const fSem = semFilter.toLowerCase();
+        if (uSem !== fSem && !uSem.includes(fSem) && !fSem.includes(uSem)) return false;
+      }
       return true;
     })
     .filter(
-      (u) =>
+      (u: any) =>
         (u.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.rollNo || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.facultyId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.hodId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.role || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -194,7 +227,7 @@ export function AdminUsers() {
                 <span className="text-muted-foreground font-semibold">Year:</span>
                 <select
                   value={yearFilter}
-                  onChange={(e) => setYearFilter(e.target.value)}
+                  onChange={(e) => handleYearFilterChange(e.target.value)}
                   className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
                 >
                   <option value="Overall">Overall</option>
@@ -208,17 +241,26 @@ export function AdminUsers() {
               <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-xl border border-border text-xs font-medium">
                 <span className="text-muted-foreground font-semibold">Branch:</span>
                 <select
-                  value={branchFilter}
+                  value={(!isSuperAdmin && hodBranch) ? hodBranch : branchFilter}
                   onChange={(e) => setBranchFilter(e.target.value)}
-                  className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
+                  disabled={!isSuperAdmin && !!hodBranch}
+                  className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer disabled:opacity-80"
                 >
-                  <option value="Overall">Overall</option>
-                  <option value="CSE">CSE</option>
-                  <option value="ECE">ECE</option>
-                  <option value="EEE">EEE</option>
-                  <option value="MECH">MECH</option>
-                  <option value="CIVIL">CIVIL</option>
-                  <option value="IT">IT</option>
+                  {(!isSuperAdmin && hodBranch) ? (
+                    <option value={hodBranch}>{hodBranch}</option>
+                  ) : (
+                    <>
+                      <option value="Overall">Overall</option>
+                      <option value="CSE">CSE</option>
+                      <option value="AI & ML">AI & ML</option>
+                      <option value="AI & DS">AI & DS</option>
+                      <option value="IT">IT</option>
+                      <option value="ECE">ECE</option>
+                      <option value="EEE">EEE</option>
+                      <option value="MECH">MECH</option>
+                      <option value="CIVIL">CIVIL</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -229,9 +271,11 @@ export function AdminUsers() {
                   onChange={(e) => setSemFilter(e.target.value)}
                   className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
                 >
-                  <option value="Overall">Overall</option>
-                  <option value="Sem 1">Sem 1</option>
-                  <option value="Sem 2">Sem 2</option>
+                  {getSemOptionsForYear(yearFilter).map((semOpt) => (
+                    <option key={semOpt} value={semOpt}>
+                      {semOpt}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -253,10 +297,10 @@ export function AdminUsers() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <input
-                placeholder="Search by name or email..."
+                placeholder="Search by name, email, roll no, or staff ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40 w-44"
+                className="rounded-full border border-border bg-card py-1.5 pl-8 pr-3 text-xs outline-none focus:ring-2 focus:ring-ring/40 w-56"
               />
             </div>
           </div>
@@ -273,9 +317,10 @@ export function AdminUsers() {
               <thead>
                 <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-bold">
                   <th className="pb-3 font-semibold">User Details</th>
-                  <th className="pb-3 font-semibold">Role</th>
+                  <th className="pb-3 font-semibold">ID / Roll No</th>
+                  <th className="pb-3 font-semibold">Role & Branch</th>
+                  <th className="pb-3 font-semibold">Academic Info</th>
                   <th className="pb-3 font-semibold">Account Status</th>
-                  <th className="pb-3 font-semibold">Joined Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -288,11 +333,18 @@ export function AdminUsers() {
                       ? "bg-primary/10 text-primary border-primary/20"
                       : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
 
+                  const displayId =
+                    roleStr === "STUDENT"
+                      ? entry.rollNo || "N/A"
+                      : roleStr === "FACULTY"
+                      ? entry.facultyId || "N/A"
+                      : entry.hodId || "N/A";
+
                   return (
                     <tr key={entry.id} className="border-b border-border/50 transition hover:bg-secondary/30">
                       <td className="py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold font-display text-sm">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold font-display text-sm shrink-0">
                             {entry.name?.charAt(0).toUpperCase() || "U"}
                           </div>
                           <div>
@@ -302,18 +354,35 @@ export function AdminUsers() {
                         </div>
                       </td>
 
+                      <td className="py-3.5 font-mono text-[11px] font-bold text-foreground">
+                        {displayId}
+                      </td>
+
                       <td className="py-3.5">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border uppercase ${roleBadgeClass}`}>
-                          {roleStr}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border uppercase ${roleBadgeClass}`}>
+                            {roleStr}
+                          </span>
+                          <span className="text-xs font-semibold text-muted-foreground bg-secondary px-2 py-0.5 rounded-lg">
+                            {entry.branch || "General"}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5">
+                        {roleStr === "STUDENT" ? (
+                          <div className="flex items-center gap-1.5 text-foreground font-medium text-[11px]">
+                            <span className="font-semibold text-primary">{entry.year || "1st Year"}</span> • 
+                            <span>{entry.sem || "1st Sem"}</span> • 
+                            <span className="rounded bg-primary/10 text-primary px-1.5 py-0.2 text-[10px] font-bold">Sec {entry.section || "A"}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-[11px]">Department Staff</span>
+                        )}
                       </td>
 
                       <td className="py-3.5">
                         <StatusPill status={entry.active ? "Active" : "Rejected"} />
-                      </td>
-
-                      <td className="py-3.5 text-muted-foreground font-medium">
-                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : "Recently"}
                       </td>
                     </tr>
                   );

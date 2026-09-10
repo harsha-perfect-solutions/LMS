@@ -115,6 +115,10 @@ exports.login = async (req, res) => {
       name: user.name, 
       email: user.email, 
       role: user.role,
+      branch: user.branch,
+      year: user.year,
+      sem: user.sem,
+      section: user.section,
       message: "Login successful"
     });
   } catch (error) {
@@ -129,6 +133,10 @@ exports.validate = async (req, res) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    branch: user.branch,
+    year: user.year,
+    sem: user.sem,
+    section: user.section,
     token: req.headers.authorization.slice(7),
     message: "Token is valid",
   });

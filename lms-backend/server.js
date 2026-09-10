@@ -24,14 +24,41 @@ sequelize.sync({ alter: true }).then(async () => {
     await sequelize.query("UPDATE AttendanceRecords SET periodsAttended = 1 WHERE periodsAttended IS NULL AND value > 0;");
   } catch (e) {}
 
+  try {
+    await sequelize.query("ALTER TABLE Users ADD COLUMN section VARCHAR(255) DEFAULT 'A';");
+  } catch (e) {}
+  try {
+    await sequelize.query("ALTER TABLE Users ADD COLUMN rollNo VARCHAR(255);");
+  } catch (e) {}
+  try {
+    await sequelize.query("ALTER TABLE Users ADD COLUMN facultyId VARCHAR(255);");
+  } catch (e) {}
+  try {
+    await sequelize.query("ALTER TABLE Users ADD COLUMN hodId VARCHAR(255);");
+  } catch (e) {}
+
+  try {
+    await sequelize.query("ALTER TABLE Courses ADD COLUMN year VARCHAR(255) DEFAULT 'ALL';");
+  } catch (e) {}
+  try {
+    await sequelize.query("ALTER TABLE Courses ADD COLUMN sem VARCHAR(255) DEFAULT 'ALL';");
+  } catch (e) {}
+  try {
+    await sequelize.query("ALTER TABLE Courses ADD COLUMN section VARCHAR(255) DEFAULT 'ALL';");
+  } catch (e) {}
+
+  try {
+    await sequelize.query("ALTER TABLE Announcements ADD COLUMN branch VARCHAR(255) DEFAULT 'ALL';");
+  } catch (e) {}
+
   const count = await User.count();
   if (count === 0) {
-    await User.bulkCreate([
-      { name: "Admin User", email: "admin@example.com", password: bcrypt.hashSync("password123", 10), role: "ADMIN", active: true, isVerified: true },
-      { name: "Faculty User", email: "faculty@example.com", password: bcrypt.hashSync("password123", 10), role: "FACULTY", active: true, isVerified: true },
-      { name: "Student User", email: "student@example.com", password: bcrypt.hashSync("password123", 10), role: "STUDENT", active: true, isVerified: true },
-    ]);
-    console.log("Default users created");
+    try {
+      console.log("Database empty. Generating 355 mock users across 8 branches...");
+      require("./seed_mock_data");
+    } catch (err) {
+      console.error("Auto seed failed:", err);
+    }
   }
 }).catch(err => {
   console.error("Database connection failed", err);

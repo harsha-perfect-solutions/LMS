@@ -140,6 +140,15 @@ export function FacultyAttendance({ course }: FacultyAttendanceProps) {
     }));
   };
 
+  const markAllAs = (status: "PRESENT" | "ABSENT") => {
+    if (isAlreadySubmitted || students.length === 0) return;
+    const newMap: Record<number | string, "PRESENT" | "ABSENT"> = {};
+    students.forEach((s) => {
+      newMap[s.id] = status;
+    });
+    setAttendanceMap(newMap);
+  };
+
   const handleSaveAttendance = async () => {
     if (isAlreadySubmitted) {
       alert(`Attendance for ${date} has already been submitted.`);
@@ -184,23 +193,61 @@ export function FacultyAttendance({ course }: FacultyAttendanceProps) {
       {!course && <PageHeader title="Mark Attendance" subtitle="Track and record student presence for your courses." />}
 
       <Card className="p-6">
-        <div className="flex items-center justify-between border-b border-border pb-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 mb-6 gap-4">
           <div>
             <h3 className="text-lg font-bold font-display flex items-center gap-2 text-foreground">
               <CalendarCheck className="h-5 w-5 text-primary" /> Mark Course Attendance
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              All enrolled students are marked PRESENT by default. Toggle absent students before submitting.
+              All enrolled students are marked PRESENT by default. Toggle "Absent (Mark All)" to default all to absent.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-500 flex items-center gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5" /> {presentCount} Present
-            </span>
-            <span className="rounded-full bg-destructive/15 px-3 py-1 text-xs font-bold text-destructive flex items-center gap-1">
-              <XCircle className="h-3.5 w-3.5" /> {absentCount} Absent
-            </span>
+          {/* Interactive Checkbox Control Badges for Bulk Present / Absent */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              disabled={isAlreadySubmitted || students.length === 0}
+              onClick={() => markAllAs("PRESENT")}
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer border ${
+                students.length > 0 && presentCount === students.length
+                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-xs ring-2 ring-emerald-500/30"
+                  : "border-border bg-secondary/50 text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/30"
+              } ${isAlreadySubmitted || students.length === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+              title="Click checkbox to mark ALL students as PRESENT"
+            >
+              <input
+                type="checkbox"
+                checked={students.length > 0 && presentCount === students.length}
+                onChange={() => markAllAs("PRESENT")}
+                disabled={isAlreadySubmitted || students.length === 0}
+                className="h-4 w-4 rounded border-emerald-500 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+              <span>{presentCount} Present (Mark All)</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isAlreadySubmitted || students.length === 0}
+              onClick={() => markAllAs("ABSENT")}
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer border ${
+                students.length > 0 && absentCount === students.length
+                  ? "border-destructive bg-destructive/20 text-destructive shadow-xs ring-2 ring-destructive/30"
+                  : "border-border bg-secondary/50 text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+              } ${isAlreadySubmitted || students.length === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+              title="Click checkbox to mark ALL students as ABSENT"
+            >
+              <input
+                type="checkbox"
+                checked={students.length > 0 && absentCount === students.length}
+                onChange={() => markAllAs("ABSENT")}
+                disabled={isAlreadySubmitted || students.length === 0}
+                className="h-4 w-4 rounded border-destructive text-destructive focus:ring-destructive cursor-pointer"
+              />
+              <XCircle className="h-3.5 w-3.5 text-destructive" />
+              <span>{absentCount} Absent (Mark All)</span>
+            </button>
           </div>
         </div>
 
@@ -295,13 +342,47 @@ export function FacultyAttendance({ course }: FacultyAttendanceProps) {
             </div>
           ) : students.length > 0 ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  Enrolled Students List ({students.length} Total)
-                </h4>
-                <span className="text-[11px] text-muted-foreground italic">
-                  {isAlreadySubmitted ? "Attendance Locked for this Date" : `Marking for ${periodsConducted} period(s) on ${date}`}
-                </span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Enrolled Students List ({students.length} Total)
+                  </h4>
+                  <span className="text-[11px] text-muted-foreground italic">
+                    {isAlreadySubmitted ? "Attendance Locked for this Date" : `Marking for ${periodsConducted} period(s) on ${date}`}
+                  </span>
+                </div>
+
+                {!isAlreadySubmitted && students.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Quick Select All:</span>
+                    <button
+                      type="button"
+                      onClick={() => markAllAs("PRESENT")}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20 transition cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={presentCount === students.length}
+                        onChange={() => markAllAs("PRESENT")}
+                        className="h-3.5 w-3.5 rounded border-emerald-500 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      All Present
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => markAllAs("ABSENT")}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 transition cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={absentCount === students.length}
+                        onChange={() => markAllAs("ABSENT")}
+                        className="h-3.5 w-3.5 rounded border-destructive text-destructive focus:ring-destructive cursor-pointer"
+                      />
+                      All Absent
+                    </button>
+                  </div>
+                )}
               </div>
 
               {students.map((st) => {
@@ -338,33 +419,49 @@ export function FacultyAttendance({ course }: FacultyAttendanceProps) {
                       </div>
                     </div>
 
-                    {/* Toggle Buttons: Present / Absent */}
+                    {/* Interactive Checkbox Buttons: Present / Absent */}
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={isAlreadySubmitted}
-                        onClick={() => toggleAttendance(st.id, "PRESENT")}
-                        className={`inline-flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                      <label
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleAttendance(st.id, "PRESENT");
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer border ${
                           isPresent
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "bg-secondary text-muted-foreground hover:bg-emerald-500/20 hover:text-emerald-500"
-                        }`}
+                            ? "bg-emerald-500 text-white border-emerald-500 shadow-sm"
+                            : "bg-secondary text-muted-foreground border-border hover:bg-emerald-500/20 hover:text-emerald-500"
+                        } ${isAlreadySubmitted ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={isPresent}
+                          onChange={() => toggleAttendance(st.id, "PRESENT")}
+                          disabled={isAlreadySubmitted}
+                          className="h-3.5 w-3.5 rounded border-white text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
                         <CheckCircle2 className="h-3.5 w-3.5" /> Present
-                      </button>
+                      </label>
 
-                      <button
-                        type="button"
-                        disabled={isAlreadySubmitted}
-                        onClick={() => toggleAttendance(st.id, "ABSENT")}
-                        className={`inline-flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                      <label
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toggleAttendance(st.id, "ABSENT");
+                        }}
+                        className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer border ${
                           !isPresent
-                            ? "bg-destructive text-white shadow-sm"
-                            : "bg-secondary text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                        }`}
+                            ? "bg-destructive text-white border-destructive shadow-sm"
+                            : "bg-secondary text-muted-foreground border-border hover:bg-destructive/20 hover:text-destructive"
+                        } ${isAlreadySubmitted ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={!isPresent}
+                          onChange={() => toggleAttendance(st.id, "ABSENT")}
+                          disabled={isAlreadySubmitted}
+                          className="h-3.5 w-3.5 rounded border-white text-destructive focus:ring-destructive cursor-pointer"
+                        />
                         <XCircle className="h-3.5 w-3.5" /> Absent
-                      </button>
+                      </label>
                     </div>
                   </div>
                 );

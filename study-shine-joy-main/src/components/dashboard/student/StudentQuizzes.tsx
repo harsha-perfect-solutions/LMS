@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader, PlayCircle, CheckCircle2, ShieldAlert, Camera, AlertTriangle, ShieldCheck, Video } from "lucide-react";
-import { type Quiz, api } from "@/lib/api";
+import { type Quiz, type Course, api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card, Btn } from "../../shared/UIPrimitives";
 
 interface StudentQuizzesProps {
@@ -8,6 +9,7 @@ interface StudentQuizzesProps {
 }
 
 export function StudentQuizzes({ course }: StudentQuizzesProps = {}) {
+  const { user } = useAuth();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
@@ -474,8 +476,7 @@ export function StudentQuizzes({ course }: StudentQuizzesProps = {}) {
             const attempt = myAttempts.find((att: any) => String(att.quizId) === String(q.id));
             const isCompleted = Boolean(
               attempt ||
-              q.status === "COMPLETED" ||
-              localStorage.getItem(`quiz_completed_${q.id}`)
+              (user?.id && localStorage.getItem(`quiz_completed_${user.id}_${q.id}`))
             );
             const scoreMarks = attempt ? attempt.marks : undefined;
 

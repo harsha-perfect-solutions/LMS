@@ -11,9 +11,14 @@ import {
   Legend
 } from "recharts";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card } from "../../shared/UIPrimitives";
 
 export function AdminReports() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.email === "admin@example.com";
+  const hodBranch = currentUser?.branch || "";
+
   const [analyticsData, setAnalyticsData] = useState<{
     quizzes: any[];
     assignments: any[];
@@ -51,23 +56,31 @@ export function AdminReports() {
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [selectedAttendance, setSelectedAttendance] = useState<any | null>(null);
 
-  // Quiz Filter States (Default: "Overall")
+  // Quiz Filter States (Default: "Overall" or hodBranch)
   const [quizYearFilter, setQuizYearFilter] = useState("Overall");
-  const [quizBranchFilter, setQuizBranchFilter] = useState("Overall");
+  const [quizBranchFilter, setQuizBranchFilter] = useState(hodBranch || "Overall");
   const [quizSemFilter, setQuizSemFilter] = useState("Overall");
   const [quizRegulationFilter, setQuizRegulationFilter] = useState("Overall");
 
-  // Assignment Filter States (Default: "Overall")
+  // Assignment Filter States (Default: "Overall" or hodBranch)
   const [assignmentYearFilter, setAssignmentYearFilter] = useState("Overall");
-  const [assignmentBranchFilter, setAssignmentBranchFilter] = useState("Overall");
+  const [assignmentBranchFilter, setAssignmentBranchFilter] = useState(hodBranch || "Overall");
   const [assignmentSemFilter, setAssignmentSemFilter] = useState("Overall");
   const [assignmentRegulationFilter, setAssignmentRegulationFilter] = useState("Overall");
 
-  // Attendance Filter States (Default: "Overall")
+  // Attendance Filter States (Default: "Overall" or hodBranch)
   const [attendanceYearFilter, setAttendanceYearFilter] = useState("Overall");
-  const [attendanceBranchFilter, setAttendanceBranchFilter] = useState("Overall");
+  const [attendanceBranchFilter, setAttendanceBranchFilter] = useState(hodBranch || "Overall");
   const [attendanceSemFilter, setAttendanceSemFilter] = useState("Overall");
   const [attendanceDateFilter, setAttendanceDateFilter] = useState("Overall");
+
+  useEffect(() => {
+    if (!isSuperAdmin && hodBranch) {
+      setQuizBranchFilter(hodBranch);
+      setAssignmentBranchFilter(hodBranch);
+      setAttendanceBranchFilter(hodBranch);
+    }
+  }, [isSuperAdmin, hodBranch]);
 
   const handleQuizClick = (data: any) => {
     if (selectedQuiz) return;
@@ -368,17 +381,26 @@ export function AdminReports() {
                     <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-xl border border-border text-xs font-medium">
                       <span className="text-muted-foreground font-semibold">Branch:</span>
                       <select
-                        value={quizBranchFilter}
+                        value={(!isSuperAdmin && hodBranch) ? hodBranch : quizBranchFilter}
                         onChange={(e) => setQuizBranchFilter(e.target.value)}
-                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
+                        disabled={!isSuperAdmin && !!hodBranch}
+                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer disabled:opacity-80"
                       >
-                        <option value="Overall">Overall</option>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="EEE">EEE</option>
-                        <option value="MECH">MECH</option>
-                        <option value="CIVIL">CIVIL</option>
-                        <option value="IT">IT</option>
+                        {(!isSuperAdmin && hodBranch) ? (
+                          <option value={hodBranch}>{hodBranch}</option>
+                        ) : (
+                          <>
+                            <option value="Overall">Overall</option>
+                            <option value="CSE">CSE</option>
+                            <option value="AI & ML">AI & ML</option>
+                            <option value="AI & DS">AI & DS</option>
+                            <option value="IT">IT</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="MECH">MECH</option>
+                            <option value="CIVIL">CIVIL</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -572,17 +594,26 @@ export function AdminReports() {
                     <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-xl border border-border text-xs font-medium">
                       <span className="text-muted-foreground font-semibold">Branch:</span>
                       <select
-                        value={assignmentBranchFilter}
+                        value={(!isSuperAdmin && hodBranch) ? hodBranch : assignmentBranchFilter}
                         onChange={(e) => setAssignmentBranchFilter(e.target.value)}
-                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
+                        disabled={!isSuperAdmin && !!hodBranch}
+                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer disabled:opacity-80"
                       >
-                        <option value="Overall">Overall</option>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="EEE">EEE</option>
-                        <option value="MECH">MECH</option>
-                        <option value="CIVIL">CIVIL</option>
-                        <option value="IT">IT</option>
+                        {(!isSuperAdmin && hodBranch) ? (
+                          <option value={hodBranch}>{hodBranch}</option>
+                        ) : (
+                          <>
+                            <option value="Overall">Overall</option>
+                            <option value="CSE">CSE</option>
+                            <option value="AI & ML">AI & ML</option>
+                            <option value="AI & DS">AI & DS</option>
+                            <option value="IT">IT</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="MECH">MECH</option>
+                            <option value="CIVIL">CIVIL</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -776,17 +807,26 @@ export function AdminReports() {
                     <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-xl border border-border text-xs font-medium">
                       <span className="text-muted-foreground font-semibold">Branch:</span>
                       <select
-                        value={attendanceBranchFilter}
+                        value={(!isSuperAdmin && hodBranch) ? hodBranch : attendanceBranchFilter}
                         onChange={(e) => setAttendanceBranchFilter(e.target.value)}
-                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer"
+                        disabled={!isSuperAdmin && !!hodBranch}
+                        className="bg-transparent font-bold text-foreground focus:outline-none cursor-pointer disabled:opacity-80"
                       >
-                        <option value="Overall">Overall</option>
-                        <option value="CSE">CSE</option>
-                        <option value="ECE">ECE</option>
-                        <option value="EEE">EEE</option>
-                        <option value="MECH">MECH</option>
-                        <option value="CIVIL">CIVIL</option>
-                        <option value="IT">IT</option>
+                        {(!isSuperAdmin && hodBranch) ? (
+                          <option value={hodBranch}>{hodBranch}</option>
+                        ) : (
+                          <>
+                            <option value="Overall">Overall</option>
+                            <option value="CSE">CSE</option>
+                            <option value="AI & ML">AI & ML</option>
+                            <option value="AI & DS">AI & DS</option>
+                            <option value="IT">IT</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="MECH">MECH</option>
+                            <option value="CIVIL">CIVIL</option>
+                          </>
+                        )}
                       </select>
                     </div>
 

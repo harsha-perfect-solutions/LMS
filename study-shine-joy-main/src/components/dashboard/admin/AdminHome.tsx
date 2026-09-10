@@ -11,9 +11,14 @@ import {
   Legend
 } from "recharts";
 import { type Course, type AdminStats, api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { PageHeader, Card, Btn } from "../../shared/UIPrimitives";
 
 export function AdminHome() {
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.email === "admin@example.com";
+  const hodBranch = currentUser?.branch || "";
+
   const [stats, setStats] = useState<{ label: string; value: number | string; delta: string }[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [analyticsData, setAnalyticsData] = useState<{
@@ -84,35 +89,45 @@ export function AdminHome() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [statsRes, coursesRes] = await Promise.all([
+      const [statsRes, coursesRes, usersRes] = await Promise.all([
         api.getAdminStats(),
-        api.getCourses()
+        api.getCourses(),
+        api.getUsers()
       ]);
+
+      let scopedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
+      if (!isSuperAdmin && hodBranch) {
+        scopedUsers = scopedUsers.filter((u: any) => u.branch === hodBranch);
+      }
 
       if (statsRes.success && statsRes.data) {
         const data = statsRes.data as AdminStats;
+        const totalUCount = scopedUsers.length || data.totalUsers;
+        const activeUCount = scopedUsers.filter((u: any) => u.active).length || data.activeUsers;
+
         setStats([
-          { label: "Total users", value: data.totalUsers, delta: `${data.activeUsers} active` },
+          { label: "Department Users", value: totalUCount, delta: `${activeUCount} active` },
           {
-            label: "Active courses",
+            label: "Active Courses",
             value: data.approvedCourses,
-            delta: `${data.pendingApprovals} pending`,
+            delta: "Active",
           },
           {
-            label: "Total assignments",
+            label: "Total Assignments",
             value: data.totalAssignments,
             delta: `${data.totalSubmissions} submissions`,
           },
-          { label: "System health", value: "98%", delta: "Stable" },
+          { label: "System Health", value: "98%", delta: "Stable" },
         ]);
       }
 
       if (coursesRes.success && coursesRes.data) {
-        setCourses(
-          Array.isArray(coursesRes.data)
-            ? coursesRes.data.filter((course) => course.status?.toUpperCase() === "PENDING")
-            : [],
-        );
+        const rawCourses = Array.isArray(coursesRes.data) ? coursesRes.data : [];
+        const pendingOnly = rawCourses.filter((course) => course.status?.toUpperCase() === "PENDING");
+        const scopedPending = (!isSuperAdmin && hodBranch)
+          ? pendingOnly.filter((c) => !c.branch || c.branch === "ALL" || c.branch === hodBranch)
+          : pendingOnly;
+        setCourses(scopedPending);
       }
     } finally {
       setLoading(false);
@@ -124,10 +139,20 @@ export function AdminHome() {
       setAnalyticsLoading(true);
       const res = await api.getEnrollmentTrend("overall");
       if (res.success && res.data) {
+        let rawQuizzes = Array.isArray(res.data.quizzes) ? res.data.quizzes : [];
+        let rawAssignments = Array.isArray(res.data.assignments) ? res.data.assignments : [];
+        let rawAttendance = Array.isArray(res.data.attendance) ? res.data.attendance : [];
+
+        if (!isSuperAdmin && hodBranch) {
+          rawQuizzes = rawQuizzes.filter((q: any) => !q.branch || q.branch === "ALL" || q.branch === hodBranch);
+          rawAssignments = rawAssignments.filter((a: any) => !a.branch || a.branch === "ALL" || a.branch === hodBranch);
+          rawAttendance = rawAttendance.filter((at: any) => !at.branch || at.branch === "ALL" || at.branch === hodBranch);
+        }
+
         setAnalyticsData({
-          quizzes: Array.isArray(res.data.quizzes) ? res.data.quizzes : [],
-          assignments: Array.isArray(res.data.assignments) ? res.data.assignments : [],
-          attendance: Array.isArray(res.data.attendance) ? res.data.attendance : [],
+          quizzes: rawQuizzes,
+          assignments: rawAssignments,
+          attendance: rawAttendance,
           stats: res.data.stats || {
             totalQuizModules: 0,
             quizAvg: 0,
@@ -417,51 +442,68 @@ export function AdminHome() {
         </Card>
       </div>
 
-      {/* Pending Approvals Bottom Section */}
-      <div className="mt-6">
-        <Card>
-          <h3 className="mb-3 font-display text-lg font-bold">Pending Course Approvals</h3>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader className="h-5 w-5 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {courses.map((course) => (
-                <div
-                  key={course.id}
-                  className="rounded-xl border border-border bg-secondary/40 p-3.5 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="font-bold text-sm text-foreground">{course.title}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Faculty: {course.facultyName || "Faculty"}</div>
-                  </div>
-                  <div className="mt-3 flex gap-2">
-                    <Btn
-                      variant="soft"
-                      className="px-3 py-1 text-xs flex-1 justify-center"
-                      onClick={() => handleApprove(course.id)}
-                    >
-                      Approve
-                    </Btn>
-                    <button
-                      onClick={() => handleReject(course.id)}
-                      className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium hover:bg-secondary flex-1 text-center"
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {courses.length === 0 && (
-                <div className="py-6 text-center text-sm text-muted-foreground col-span-full">
-                  No courses pending approval
-                </div>
+      {/* Department Pending Course Approvals (For Branch HODs) */}
+      {!isSuperAdmin && hodBranch && (
+        <div className="mt-6">
+          <Card>
+            <div className="flex items-center justify-between mb-3 border-b border-border pb-3">
+              <div>
+                <h3 className="font-display text-base font-bold text-foreground">
+                  Pending Course Approvals ({hodBranch} Department)
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Review course registration proposals submitted by {hodBranch} faculty.
+                </p>
+              </div>
+              {courses.length > 0 && (
+                <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                  {courses.length} Pending Approval
+                </span>
               )}
             </div>
-          )}
-        </Card>
-      </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {courses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="rounded-xl border border-border bg-secondary/40 p-3.5 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="font-bold text-sm text-foreground">{course.title} ({course.code})</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Faculty: {course.facultyName || "Faculty"}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Btn
+                        variant="soft"
+                        className="px-3 py-1 text-xs flex-1 justify-center font-bold"
+                        onClick={() => handleApprove(course.id)}
+                      >
+                        Approve Course
+                      </Btn>
+                      <button
+                        onClick={() => handleReject(course.id)}
+                        className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium hover:bg-secondary flex-1 text-center"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {courses.length === 0 && (
+                  <div className="py-6 text-center text-xs text-muted-foreground col-span-full italic">
+                    No pending course registration approvals for {hodBranch} department.
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </>
   );
 }

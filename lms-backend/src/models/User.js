@@ -17,5 +17,9 @@ module.exports = (sequelize) => {
     year: { type: DataTypes.STRING, defaultValue: "3rd Year" },
     branch: { type: DataTypes.STRING, defaultValue: "CSE" },
     sem: { type: DataTypes.STRING, defaultValue: "Sem 1" },
+    section: { type: DataTypes.STRING, defaultValue: "A" },
+    rollNo: { type: DataTypes.STRING },
+    facultyId: { type: DataTypes.STRING },
+    hodId: { type: DataTypes.STRING },
   });
 };
